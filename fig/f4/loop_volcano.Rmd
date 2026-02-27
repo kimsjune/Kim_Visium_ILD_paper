@@ -1,0 +1,82 @@
+---
+title: "Fig 4d"
+output: html_document
+author: "Seung J. Kim (skim823@uwo.ca)"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+source("/Users/jk/Documents/Lab2/visium/r_analysis/ann_finest_level/401/5p_deseq2/pool_cond_niches_comparison/loop_dds.R")
+```
+
+```{r,  fig.height = 8, fig.width = 12 }
+# Function to generate volcano plot from a DESeqDataSet
+make_volcano_plot <- function(dds_obj, name) {
+  res <- results(dds_obj)
+  volcano_df <- as.data.frame(res)
+  volcano_df$gene <- rownames(volcano_df)
+  volcano_df$logFC <- volcano_df$log2FoldChange
+  volcano_df$adjPValue <- volcano_df$padj
+  
+  # classify genes
+  volcano_df$de <- "NA"
+  volcano_df$de[volcano_df$logFC >= 1 & volcano_df$adjPValue < 0.05] <- "UP"
+  volcano_df$de[volcano_df$logFC <= -1 & volcano_df$adjPValue < 0.05] <- "DN"
+  volcano_df$deLab <- ifelse(volcano_df$de != "NA", volcano_df$gene, NA)
+  
+  # build plot
+  ggplot(data = volcano_df,
+         aes(x = -log10(adjPValue),
+             y = logFC,
+             color = de,
+             label = deLab)) +
+    geom_point() +
+    geom_vline(xintercept = -log10(0.05), col = "black", linetype = 3) +
+    geom_hline(yintercept = c(-1, 1), col = "black", linetype = 3) +
+    # geom_text_repel(
+    #   data = subset(volcano_df, abs(logFC) >= 2 & adjPValue < 1e-5),
+    #   segment.colour = "black",
+    #   segment.linetype = 3,
+    #   position = position_nudge_center(x = 0, y = 0.15, center_y = 0, center_x = 15),
+    #   min.segment.length = 0,
+    #   max.overlaps = 18) +
+    scale_color_manual(values = c("DN" = "darkblue", "NA" = "grey75", "UP" = "red")) +
+    theme_bw() +
+    theme(
+      axis.ticks = element_line(colour = "black"),
+      axis.line = element_line(linewidth = 0.2, colour = "black"),
+      panel.border = element_blank(),
+      text = element_text(size = 14, color = "black"),
+      axis.text = element_text(size = 14, color = "black"),
+      #axis.text.y = element_blank(),
+      plot.margin = unit(c(0,0,0,0), "mm"),
+      plot.background = element_rect(fill = "transparent", colour = NA),
+      panel.background = element_rect(fill = "transparent", colour = NA),
+      panel.grid = element_blank(),
+      legend.position = "none",
+      aspect.ratio = 1,
+      plot.subtitle = element_text(size = 14, color = "black")
+    ) +
+    labs(subtitle = paste0(name," vs others")) +
+    xlab("") + ylab("")
+}
+
+# Apply to each item in dds_list
+volcano_plot_list <- lapply(names(dds_list), function(n) {
+  make_volcano_plot(dds_list[[n]], name = n)
+})
+names(volcano_plot_list) <- names(dds_list)  # Name each plot by contrast name
+
+
+grid_patchwork <- patchwork::wrap_plots(
+  volcano_plot_list[c('ATI/Endo', 'Alv. FB/immune', 'Plasma', 'SMC', 'ATII', 'Immune', 'Airway', 'Adv. FB', 'Perib. FB', 'Alv. macro', 'Macro', 'B')], ncol = 4, nrow = 3, axis_titles = "collect"
+) 
+
+print(grid_patchwork)
+dir.create("figs", showWarnings = FALSE)
+
+ggsave("figs/volcano_3x4_reordered.pdf",  plot = grid_patchwork,  height = 8, width = 12, bg = "transparent")
+```

@@ -1,0 +1,101 @@
+---
+title: "Supp. Fig 6c"
+output: html_document
+author: "Seung J. Kim (skim823@uwo.ca)"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+source("/Users/jk/Documents/Lab2/visium/r_analysis/ann_finest_level/401/5p_deseq2/pool_cond_niches_comparison/loop_dds.R")
+```
+
+```{r}
+library(jsonlite)
+library(VennDiagram)
+
+library(clusterProfiler)
+library(org.Hs.eg.db)
+library(viridis)
+shared_genes_by_niche <- fromJSON("/Users/jk/Documents/Lab2/visium/python_analysis/local_401/nmf/ann_finest_level/nfact12/json/shared_genes_by_niche.json")
+up_genes_list <- list() # to store upregulated gene names
+
+# Create output directory
+dir.create("venn", showWarnings = FALSE)
+
+# Get all niche names from up_genes_list
+up_genes_loop <- function(name){
+  r <- res_list[[name]]
+  
+  # Logical vector to find valid rows
+  valid_up <- which(!is.na(r$padj) & !is.na(r$log2FoldChange) & 
+                      r$padj < 0.05 & r$log2FoldChange > 1)
+  
+  up_genes_list[[name]] <- rownames(r)[valid_up]
+
+}
+
+up_genes_list <- lapply(names(res_list), up_genes_loop)
+names(up_genes_list) <- names(res_list)
+
+
+venn_list <- list()
+# Loop over each niche
+for (niche in niches) {
+  
+  svgs <- shared_genes_by_niche[[niche]]
+  
+  # Get corresponding DEGs from up_genes_list
+  degs <- unlist(up_genes_list[[niche]])
+  
+  # Skip if union or DEGs are empty
+  # if (length(svg_union) == 0 || length(degs) == 0) {
+  #   next
+  # }
+  
+  safe_niche <- gsub("_+", "_", # collapse multiple _ into just one
+                     gsub("[^A-Za-z0-9]", "_", niche)) # nested gsub!  # replaces punctuation and whitespace
+  filename <- file.path("venn", paste0(safe_niche, ".tiff"))
+  
+  # Create the Venn diagram
+  venn_list[[niche]] <- as_gtable(
+    suppressWarnings(
+        venn.diagram(
+    x = list(SVGs = svgs, DEGs = degs),
+    main = niche,
+    main.fontfamily = "sans",
+    main.cex = 5,
+    main.pos = c(0.5, 0.95),
+    filename = NULL,
+    fill = c("darkblue", "red4"),
+    category.names = c("", ""),
+    disable.logging = TRUE,
+    margin = 0.2,
+    fontfamily = "sans",
+    cex = 5,
+    #cat.cex = 3,
+    #cat.pos = c(30, -30),
+    #cat.dist = c(0.1, 0.1),
+    inverted = length(svgs) > length(degs),
+    ext.text = T, scaled = T,
+    resolution = 500, verbose = F
+  )
+    )
+  )
+  
+  message("Saved: ", filename)
+}
+
+venn_plotgrid <- plot_grid(
+  plotlist = venn_list[c('ATI/Endo', 'Alv. FB/immune', 'Plasma', 'SMC', 'ATII', 'Immune', 'Airway', 'Adv. FB', 'Perib. FB', 'Alv. macro', 'Macro', 'B')], ncol = 3, nrow = 4
+) 
+cowplot::save_plot("venn/venn_plotgrid.pdf",  plot = venn_plotgrid, base_height = 20, base_width = 15, base_asp = 1.6)
+cowplot::save_plot("venn/venn_plotgrid.tiff",  plot = venn_plotgrid, base_height = 20, base_width = 15, base_asp = 1.6)
+
+```
+
+```{r, fig.height = 20, fig.width = 15}
+venn_plotgrid
+```

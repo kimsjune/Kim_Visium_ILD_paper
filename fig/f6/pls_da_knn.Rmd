@@ -1,0 +1,221 @@
+---
+title: "Fig 6d, g"
+output: html_document
+author: "Seung J. Kim (skim823@uwo.ca)"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(glmnet)
+library(readr)
+library(dplyr)
+library(Matrix)
+library(pROC)
+library(readxl)
+library(caret)
+library(dplyr)
+
+error_list <- list()
+conf_mat <- list()
+
+for (j in c(6)) {
+  # Read the CSV created above
+  mclust <- read_csv(paste0("/Users/jk/Documents/Lab2/visium/python_analysis/local_401/nmf/ann_finest_level/nfact12/csv/prop_no_unc_mclust_refined_",j,".csv"))   # path to python export
+  # bad_ids <- c( "20_22642_A1", "20_33362_C4", "20_26330_B3")
+  # 
+  # mclust<- mclust %>%
+  #    filter(!library_id %in% bad_ids)
+  # If including'condition' or 'cond', use that. Otherwise pull from separate mapping.
+  # Here there is 'cond' column OR create it manually:
+  # mclust$cond <- c("IPF","CHP", ...)  # if needed
+  # no_dlco_ids <- c("20_33362_C4","21_55244_B1","12_39986_A2","06_30914_A1","11_13888_A1")
+  # mclust<- mclust %>%
+  #   filter(!library_id %in% bad_ids)
+  # a separate metadata file mapping library_id -> cond
+  meta <- read_csv("/Users/jk/Documents/Lab2/visium/python_analysis/local_401/nmf/ann_finest_level/nfact12/spCLUE/library_to_cond.csv") 
+  #meta <- read_xlsx("/Users/jk/Documents/Lab2/visium/python_analysis/lambda/metadata_batch_effect.xlsx")
+  mclust_tibble <- left_join(mclust, meta, by = "library_id")
+  mclust_tibble <- mclust_tibble %>%
+    #filter(cond != "UNC")%>%
+    mutate(
+      cond = recode(cond,
+                    "NSIP" = "nonIPF",
+                    "CHP"  = "nonIPF")
+    ) 
+  
+
+  y <- factor(mclust_tibble$cond)
+  #y <- factor(gsub("LTx", "DEAD", mclust_tibble$outcome_long))
+  
+  # Remove non-feature cols (library_id, cond). Keep only numeric predictors.
+  X <- mclust_tibble[,c(2:(ncol(mclust_tibble)-2))] %>% as.matrix()
+  
+  
+  # X: feature matrix (28 x 14)
+  # y: factor vector of class labels (28 samples)
+  
+  n <- nrow(X)
+  classes <- levels(y)
+  preds <- factor(rep(NA, n), levels = classes)
+  probs_loocv <- matrix(NA, n, length(classes))
+  
+  set.seed(1234123)
+  
+  # LOOCV
+  for (i in 1:n) {
+    train_idx <- setdiff(1:n, i)
+    test_idx  <- i
+    
+    X_train <- X[train_idx, ]
+    y_train <- y[train_idx]
+    X_test  <- X[test_idx, , drop = FALSE]
+    
+    # --- Step 1: Fit PLS-DA on training data ---
+    plsda_fit <- mixOmics::plsda(X_train, y_train, ncomp = 2)
+    #plotIndiv(plsda_fit)
+    
+    # --- Training scores (first 2 components) ---
+    train_scores <- plsda_fit$variates$X[, 1:2, drop = FALSE]
+    
+    # --- Test scores (first 2 components) ---
+    test_pred <- predict(plsda_fit, X_test)
+    # Depending on the version, this might be a list of length 1
+    # Coerce to a matrix and select first 2 components
+    #test_scores <- as.matrix(test_pred$variates$X)[, 1:2, drop = FALSE]
+    
+    # --- Step 2: Fit KNN on training projections ---
+    knn_fit <- knn3(train_scores, y_train, k = 9)
+    
+    # --- Step 3: Predict held-out sample ---
+    prob <- predict(knn_fit, test_pred$variates, type ='prob')
+    probs_loocv[test_idx] <- prob[1]
+    preds[test_idx] <- colnames(prob)[which.max(prob)]
+  }
+  
+  # --- Results ---
+  # Misclassification error
+  class_err <- mean(preds != y)
+  cat("LOOCV Misclassification Error:", class_err, "\n")
+  error_list[[as.character(j)]] <- class_err
+  conf_mat[[as.character(j)]] <- confusionMatrix(preds, y)
+  
+  
+  # Confusion matrix
+  # conf_mat <- confusionMatrix(preds, y)
+  # print(conf_mat)
+}
+
+print(conf_mat)
+
+
+##
+
+# --- Training data ---
+train_df <- as.data.frame(train_scores)
+colnames(train_df) <- c("comp1", "comp2")
+train_df$category <- factor(plsda_fit$Y)
+
+# --- Test data ---
+# test_pred$variates$X has the PLS-DA projected coordinates for the test sample
+test_df <- as.data.frame(test_pred$variates[, 1:2, drop = FALSE])
+colnames(test_df) <- c("comp1", "comp2")
+test_df$category <- factor(preds[test_idx])  # true class label of test sample
+
+
+# Add a column marking train/test
+train_df$set <- "Train"
+test_df$set  <- "Test"
+
+# Combine into one df
+plot_df <- rbind(train_df, test_df)
+
+
+
+roc<- roc(response = as.numeric(mclust_tibble$cond == "IPF"),
+          predictor = probs_loocv[, 1], smooth = F)
+roc
+
+```
+```{r, fig.height=4, fig.width=4}
+# Basic scatter plot
+ggplot(plot_df, aes(x = comp1, y = comp2)) +
+  geom_point(aes(fill = category, shape = set), size = 3) +
+  theme_bw() +
+  xlab("PLS-DA Component 1") +
+  ylab("PLS-DA Component 2") +
+  scale_fill_manual("Diagnosis",values = c("#3c67a4",'plum3'
+  )) +
+  scale_shape_manual("Train/Test", values = c(24,21))+
+  theme(
+    # grid lines can be controversial, in my field it's not seen often
+    aspect.ratio = 1,
+    panel.grid.minor=element_blank(), 
+    panel.grid.major=element_blank(),
+    axis.text = element_text(color="black",size=14), # default font size is too small
+    axis.text.x = element_text(hjust = 0.5),
+    axis.ticks = element_line(colour="black", linewidth = 1), # just plain old black please
+    axis.title = element_text(size=14), # default font size is too small
+    legend.title=element_text(size=14, vjust=0.5, hjust=0.5),
+    legend.text=element_text(size=14, vjust=0.5, hjust=0),
+    plot.margin=unit(c(1,1,1,1),"mm"),
+    plot.background=element_rect(fill="transparent", colour=NA),
+    panel.border = element_rect(colour="black", linewidth = 1), # I like to draw a crisp border
+    panel.background=element_rect(fill="transparent", colour=NA),
+    legend.background=element_rect(fill="transparent", colour=NA),
+    legend.box.background=element_rect(fill="transparent", colour=NA),
+    legend.key=element_rect(fill="transparent", colour=NA),
+    legend.position = 'bottom')+
+  guides(
+    fill = guide_legend(title = "Diagnosis", 
+                        override.aes = list(shape = 21), nrow = 2, title.position = 'top'
+    ),
+    shape = guide_legend(title = "Train/Test", nrow = 2, title.position = 'top')
+  )
+```
+
+
+
+```{r, fig.height=3, fig.width=3}
+ggroc(list(IPF=roc#, nonIPF=roc_nonipf
+), 
+linewidth=0.75,legacy.axes = T)+
+  theme_bw()+
+  geom_abline(slope=1, intercept=0, lty = 2)+
+  xlab("FPR")+
+  ylab("TPR")+
+  theme(
+    # grid lines can be controversial, in my field it's not seen often
+    panel.grid.minor=element_blank(), 
+    panel.grid.major=element_blank(),
+    axis.text = element_text(color="black",size=14), # default font size is too small
+    axis.text.x = element_text(angle = 30, hjust = 1),
+    axis.ticks = element_line(colour="black", linewidth = 1), # just plain old black please
+    axis.title = element_text(size=14), # default font size is too small
+    legend.title=element_text(size=14, vjust=0.5, hjust=0.5),
+    legend.text=element_text(size=14, vjust=0.5, hjust=0),
+    plot.margin=unit(c(1,1,1,1),"mm"),
+    plot.background=element_rect(fill="transparent", colour=NA),
+    panel.border = element_rect(colour="black", linewidth = 1), # I like to draw a crisp border
+    panel.background=element_rect(fill="transparent", colour=NA),
+    legend.background=element_rect(fill="transparent", colour=NA),
+    legend.box.background=element_rect(fill="transparent", colour=NA),
+    legend.key=element_rect(fill="transparent", colour=NA),
+    legend.position = 'none')+
+  scale_color_manual("Diagnosis",
+                     values = c("#3c67a4"#,'maroon4'
+                     ))+
+  guides(
+    colour = guide_legend(
+      override.aes = list()
+    )
+  )+
+  annotate("text", y = c(0.05), x=0.5, 
+           label = c("AUC: 0.875"#, "AUC: 0.573"
+           ),
+           size = 5, hjust =0, color = c("#3c67a4"#,'maroon4'
+           ))
+```

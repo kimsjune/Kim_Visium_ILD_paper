@@ -1,0 +1,116 @@
+---
+title: "Fig 4e"
+output: html_document
+author: "Seung J. Kim (skim823@uwo.ca)"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+source("/Users/jk/Documents/Lab2/visium/r_analysis/ann_finest_level/401/5p_deseq2/pool_cond_niches_comparison/loop_dds.R")
+```
+
+```{r, fig.height = 6.5, fig.width = 11}
+library(clusterProfiler)
+library(org.Hs.eg.db)
+library(viridis)
+
+
+up_genes_list <- list() # to store upregulated gene names
+up_list <- list() # to store OR gene sets
+
+# Apply over all names in res_list
+enrichgo_loop <- function(name){
+  r <- res_list[[name]]
+  
+  # Logical vector to find valid rows
+  valid_up <- which(!is.na(r$padj) & !is.na(r$log2FoldChange) & 
+                      r$padj < 0.05 & r$log2FoldChange > 1)
+  
+  up_genes_list[[name]] <- rownames(r)[valid_up]
+  
+  
+  # Run enrichment analysis
+  enrich_res <- enrichGO(gene = up_genes_list[[name]],
+                         OrgDb = org.Hs.eg.db,
+                         ont = "BP",
+                         keyType = "SYMBOL")
+  
+  return(enrich_res)
+}
+
+up_list <- lapply(names(res_list), enrichgo_loop)
+# Optionally name the results
+names(up_list) <- names(res_list)
+
+
+
+# Merge the simplified results
+merged_up_result <- merge_result(rev(list(
+  #"ATI/Endo" = clusterProfiler::simplify(up_list[['ATI/Endo']], cutoff = 0.5),
+  #"Alv. FB/immune" = simplify(up_list[['Alv. FB/immune']], cutoff = 0.5),
+  "Plasma" = clusterProfiler::simplify(up_list[['Plasma']], cutoff = 0.5),
+  "SMC" = clusterProfiler::simplify(up_list[['SMC']], cutoff = 0.5),
+  "ATII" = clusterProfiler::simplify(up_list[['ATII']], cutoff = 0.5),
+  "Immune" = clusterProfiler::simplify(up_list[['Immune']], cutoff = 0.5),
+  "Airway" = clusterProfiler::simplify(up_list[['Airway']], cutoff = 0.5),
+  "Adv. FB" = clusterProfiler::simplify(up_list[['Adv. FB']], cutoff = 0.5),
+  "Perib. FB" = clusterProfiler::simplify(up_list[['Perib. FB']], cutoff = 0.5),
+  "Alv. macro" = clusterProfiler::simplify(up_list[['Alv. macro']], cutoff = 0.5),
+  "Macro" = clusterProfiler::simplify(up_list[['Macro']], cutoff = 0.5),
+  "B" = clusterProfiler::simplify(up_list[['B']], cutoff = 0.5)
+)))
+
+# Dotplot
+dotplot <- merged_up_result %>% enrichplot::dotplot(., showCategory=3)+
+  scale_fill_viridis(limits=c(1e-105, 6e-2),
+                       trans="log",
+                       breaks=c(1e-100, 1e-50, 1e-20,  5e-2))+
+  # scale_size_continuous(limits=c(1,15),
+  #                       breaks=c(5,10,15))+
+  # 
+  # scale_x_continuous(
+  #   labels=scales::number_format(accuracy=0.01))+
+  scale_y_discrete(labels=function(x) str_wrap(x,width=75))+
+  scale_x_discrete(labels=function(x) gsub("\\s*\\([^\\)]+\\)","",x))+
+  xlab("Niches")+
+  ylab("GO terms")+
+  theme(
+    panel.grid.minor=element_blank(),
+    axis.ticks = element_line(colour="black"),
+    axis.line = element_blank(),
+    axis.text.x = element_text(size=14, family='sans',angle=40,hjust=1),
+    axis.text.y = element_text(size=14, family='sans'),
+    axis.title = element_text(size=14, family='sans'),
+    text=element_text(size=14, family='sans'),
+    legend.text=element_text(size=14, family='sans'),
+    plot.margin=unit(c(0.1,0.1,0.1,0.2),"cm"),
+    legend.position="left",
+    panel.background = element_rect(fill="transparent"),
+    panel.border = element_rect(colour="black"),
+    legend.background = element_rect(fill="transparent"),
+    plot.background = element_rect(fill="transparent", colour=NA)
+  )+
+  coord_flip()+
+  guides(fill=guide_colorbar(expression(Adj.~italic(P)~value),
+                               order=1,
+                               frame.colour="black",
+                               ticks.colour="black",
+                               frame.linewidth=0.5,
+                               ticks.linewidth=0.5,
+                               label.hjust=0,
+                               label.vjust=0.5,
+                               title.hjust=0.5,
+                               # title = element_blank(),
+                               title.position = "top",
+                               title.theme = element_text(family='sans', size=14),
+                               label.theme = element_text(family='sans', size=14)))
+
+dotplot
+
+ggsave("figs/dotplot_up_genes_enrichGO_merged_cutoff_05_show_3.pdf",
+       plot = dotplot, bg = "transparent", height = 6.5, width = 11)
+```
+

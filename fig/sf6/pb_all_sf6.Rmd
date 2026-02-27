@@ -1,0 +1,177 @@
+---
+title: "Supp. Fig 6a"
+output: html_document
+author: "Seung J. Kim (skim823@uwo.ca)"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(readxl)
+library(Seurat)
+library(edgeR)
+library(zellkonverter)
+library(scater)
+library(scran)
+library(BiocParallel)
+library(BiocSingular)
+library(patchwork)
+library(batchelor)
+library(ggh4x)
+library(RColorBrewer)
+library(ComplexHeatmap)
+library(DESeq2)
+library(dplyr)
+library(stringr)
+
+file <- "/Users/jk/Documents/Lab2/visium/python_analysis/local/nmf/ann_finest_level/nfact12/h5ad/pseudobulk_all.h5ad"
+pb <- readH5AD(file, X_name = "counts", use_hdf5 = TRUE)
+
+metadata <- read_excel("/Users/jk/Documents/Lab2/visium/python_analysis/lambda/metadata_batch_effect.xlsx")
+metadata <- metadata[!metadata$library_id == '20_17478_A1',]
+
+colData(pb)$seq_batch <-factor(metadata$seq_batch)
+colData(pb)$probe_date <- factor(metadata$probe_date)
+colData(pb)$probe_group <- factor(metadata$probe_group)
+colData(pb)$training_batch <- factor(colData(pb)$training_batch)
+colData(pb)$sex <- factor(colData(pb)$sex, levels = c("M","F"))
+
+
+dds <- DESeqDataSetFromMatrix(countData = counts(pb), colData = colData(pb), design = ~ cond)
+dds <- DESeq(dds, test = "LRT", reduced = ~1)
+res <- results(dds)
+resOrdered <- res[order(res$padj),]
+resOrdered
+
+
+
+vsd <- vst(dds, blind=FALSE)
+
+
+pcaData <- plotPCA(vsd, intgroup=c("cond", "sex", "seq_batch", "probe_date", "probe_group"), returnData=TRUE)
+pcaData$cond <- factor(pcaData$cond, levels = c("IPF","NSIP","CHP","UNC"))
+percentVar <- round(100 * attr(pcaData, "percentVar"))
+
+dir_path <- "figs"
+if (!dir.exists(dir_path)) {
+  dir.create(dir_path)
+}
+
+ggsave("figs/pb_all_by_cond_probe_group.pdf",  height = 5, width = 5.5, bg = "transparent")
+p1 <- ggplot(pcaData, aes(PC1, PC2)) +
+  geom_point(aes(fill = cond, shape = probe_group), size = 3, color = "black", stroke = 0.5) +
+  scale_shape_manual(values = c("1"=21, "2"=22))+
+  #geom_text_repel(aes(label=name), size=4, max.overlaps = 50) +
+  scale_fill_manual("Diagnosis", values = c('#4c72b0', '#dd8452', '#55a868', '#c44e52')) +
+  xlab(paste0("PC1: ", percentVar[1], "% variance")) +
+  ylab(paste0("PC2: ", percentVar[2], "% variance")) + 
+  coord_fixed() +
+  theme_bw() +
+  theme(
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_blank(),
+    axis.text = element_text(color = "black", size = 14),
+    axis.ticks = element_line(colour = "black"),
+    axis.title = element_text(size = 14),
+    legend.title = element_text(size = 14, vjust = 0.5, hjust = 0.5),
+    legend.text = element_text(size = 14, vjust = 0.5, hjust = 0),
+    plot.margin = unit(c(1, 1, 1, 1), "mm"),
+    plot.background = element_rect(fill = "transparent", colour = NA),
+    panel.border = element_rect(colour = "black"),
+    panel.background = element_rect(fill = "transparent", colour = NA),
+    legend.background = element_rect(fill = "transparent", colour = NA),
+    legend.box.background = element_rect(fill = "transparent", colour = NA),
+    legend.margin = margin(t = 0, r = 0, b = 0, l = 0, unit = "mm"),
+    legend.key = element_rect(fill = "transparent", colour = NA),
+    legend.position = "bottom",
+    legend.box = "vertical",
+    aspect.ratio = 1
+  ) +
+  guides(
+    shape = guide_legend(title = "Probe lot group"),
+    fill = guide_legend(nrow = 1, title = "Diagnosis",
+                        override.aes = list(shape = 21, colour = "black", 
+                                            
+                                            fill = c('#4c72b0', '#dd8452', '#55a868', '#c44e52')))
+  )
+
+ggsave("figs/pb_all_by_sex.pdf",  height = 5, width = 5.5, bg = "transparent")
+p2 <- ggplot(pcaData, aes(PC1, PC2, shape = sex)) +
+  geom_point(size = 3) +
+  #geom_text_repel(aes(label=name), size=4, max.overlaps = 50) +
+  #scale_colour_manual("Diagnosis", values = c('#4c72b0', '#dd8452', '#55a868', '#c44e52')) +
+  scale_shape_manual(values = c("M" = 19, "F" = 22))+ 
+  xlab(paste0("PC1: ", percentVar[1], "% variance")) +
+  ylab(paste0("PC2: ", percentVar[2], "% variance")) + 
+  coord_fixed() +
+  theme_bw() +
+  theme(
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_blank(),
+    axis.text = element_text(color = "black", size = 14),
+    axis.ticks = element_line(colour = "black"),
+    axis.title = element_text(size = 14),
+    legend.title = element_text(size = 14, vjust = 0.5, hjust = 0.5),
+    legend.text = element_text(size = 14, vjust = 0.5, hjust = 0),
+    plot.margin = unit(c(1, 1, 1, 1), "mm"),
+    plot.background = element_rect(fill = "transparent", colour = NA),
+    panel.border = element_rect(colour = "black"),
+    panel.background = element_rect(fill = "transparent", colour = NA),
+    legend.background = element_rect(fill = "transparent", colour = NA),
+    legend.box.background = element_rect(fill = "transparent", colour = NA),
+    legend.margin = margin(t = 0, r = 0, b = 0, l = 0, unit = "mm"),
+    legend.key = element_rect(fill = "transparent", colour = NA),
+    legend.position = "bottom",
+    legend.box = "vertical",
+    aspect.ratio = 1
+  ) +
+  guides(
+    shape = guide_legend(title = "Sex"),
+    #color = guide_legend(nrow = 1, title = "Diagnosis")
+  )
+
+ggsave("figs/pb_all_by_seq_batch.pdf",  height = 5, width = 5.5, bg = "transparent")
+p3 <- ggplot(pcaData, aes(PC1, PC2, shape = seq_batch)) +
+  geom_point(size = 3) +
+  #geom_text_repel(aes(label=name), size=4, max.overlaps = 50) +
+  #scale_colour_manual("Diagnosis", values = c('#4c72b0', '#dd8452', '#55a868', '#c44e52')) +
+  #scale_shape_manual(values = c("M" = 19, "F" = 22))+ 
+  xlab(paste0("PC1: ", percentVar[1], "% variance")) +
+  ylab(paste0("PC2: ", percentVar[2], "% variance")) + 
+  coord_fixed() +
+  theme_bw() +
+  theme(
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_blank(),
+    axis.text = element_text(color = "black", size = 14),
+    axis.ticks = element_line(colour = "black"),
+    axis.title = element_text(size = 14),
+    legend.title = element_text(size = 14, vjust = 0.5, hjust = 0.5),
+    legend.text = element_text(size = 14, vjust = 0.5, hjust = 0),
+    plot.margin = unit(c(1, 1, 1, 1), "mm"),
+    plot.background = element_rect(fill = "transparent", colour = NA),
+    panel.border = element_rect(colour = "black"),
+    panel.background = element_rect(fill = "transparent", colour = NA),
+    legend.background = element_rect(fill = "transparent", colour = NA),
+    legend.box.background = element_rect(fill = "transparent", colour = NA),
+    legend.margin = margin(t = 0, r = 0, b = 0, l = 0, unit = "mm"),
+    legend.key = element_rect(fill = "transparent", colour = NA),
+    legend.position = "bottom",
+    legend.box = "vertical",
+    aspect.ratio = 1
+  ) +
+  guides(
+    shape = guide_legend(title = "Seq. batch")
+    #color = guide_legend(nrow = 1, title = "Diagnosis")
+  )
+
+
+
+library(cowplot)
+
+ggsave("figs/combined_plot.pdf", width = 10.5, height = 3.5)
+plot_grid(p1, p2, p3, nrow = 1, align = "h",rel_widths = c(1,1,1), greedy = TRUE)
+
+```
