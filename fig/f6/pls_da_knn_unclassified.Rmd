@@ -1,0 +1,276 @@
+---
+title: "Fig 6g, h"
+output: html_document
+author: "Seung J. Kim (skim823@uwo.ca)"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(glmnet)
+library(readr)
+library(dplyr)
+library(Matrix)
+library(pROC)
+library(readxl)
+library(caret)
+library(dplyr)
+
+
+j = 6
+dat <- read_csv(paste0("/Users/jk/Documents/Lab2/visium/python_analysis/local_401/nmf/ann_finest_level/nfact12/csv/prop_no_unc_mclust_refined_",j,".csv"))   # path to your python export
+# bad_ids <- c( "20_22642_A1", "20_33362_C4", "20_26330_B3")no
+# 
+# dat<- dat %>%
+#    filter(!library_id %in% bad_ids)
+# If you included 'condition' or 'cond', use that. Otherwise pull from separate mapping.
+# Here assume you have 'cond' column OR create it manually:
+# dat$cond <- c("IPF","CHP", ...)  # if needed
+
+# Example: assume we have a separate metadata file mapping library_id -> cond
+meta <- read_csv("/Users/jk/Documents/Lab2/visium/python_analysis/local_401/nmf/ann_finest_level/nfact12/spCLUE/library_to_cond.csv") # optional if you produced one
+#meta <- read_xlsx("/Users/jk/Documents/Lab2/visium/python_analysis/lambda/metadata_batch_effect.xlsx")
+dat2 <- left_join(dat, meta, by = "library_id")
+dat2 <- dat2 %>%
+  #filter(cond != "UNC")%>%
+  mutate(
+    cond = recode(cond,
+                  "NSIP" = "nonIPF",
+                  "CHP"  = "nonIPF")
+  ) 
+y <- factor(dat2$cond)
+#y <- factor(gsub("LTx", "DEAD", dat2$outcome_long))
+
+# Remove non-feature cols (library_id, cond). Keep only numeric predictors.
+X <- dat2[,c(2:(ncol(dat2)-2))] %>% as.matrix()
+
+
+# X: feature matrix (28 x 14)
+# y: factor vector of class labels (28 samples)
+
+n <- nrow(X)
+classes <- levels(y)
+
+
+# Read the CSV created above
+dat_unc <- read_csv(paste0("/Users/jk/Documents/Lab2/visium/python_analysis/local_401/nmf/ann_finest_level/nfact12/csv/prop_only_unc_mclust_refined_",j,".csv"))   # path to your python export
+# bad_ids <- c( "20_22642_A1", "20_33362_C4", "20_26330_B3")
+# 
+# dat<- dat %>%
+#    filter(!library_id %in% bad_ids)
+# If you included 'condition' or 'cond', use that. Otherwise pull from separate mapping.
+# Here assume you have 'cond' column OR create it manually:
+# dat$cond <- c("IPF","CHP", ...)  # if needed
+
+# Example: assume we have a separate metadata file mapping library_id -> cond
+#meta <- read_csv("/Users/jk/Documents/Lab2/visium/python_analysis/local_401/nmf/ann_finest_level/nfact12/spCLUE/library_to_cond.csv") # optional if you produced one
+#meta <- read_xlsx("/Users/jk/Documents/Lab2/visium/python_analysis/lambda/metadata_batch_effect.xlsx")
+dat2_unc <- left_join(dat_unc, meta, by = "library_id")
+dat2_unc <- dat2_unc %>%
+  #filter(cond != "UNC")%>%
+  mutate(
+    cond = recode(cond,
+                  "NSIP" = "nonIPF",
+                  "CHP"  = "nonIPF")
+  ) 
+#y <- factor(dat2$cond)
+#y <- factor(gsub("LTx", "DEAD", dat2$outcome_long))
+
+# Remove non-feature cols (library_id, cond). Keep only numeric predictors.
+X_unc <- dat2_unc[,c(2:(ncol(dat2_unc)-2))] %>% as.matrix()
+
+
+# Container for predictions
+preds_unc <- factor(rep(NA, nrow(X_unc)), levels = levels(y))
+probs_unc <- matrix(NA, nrow(X_unc), length(levels(y)))
+colnames(probs_unc) <- levels(y)
+
+# ---- Train final model on ALL training data ----
+plsda_final <- mixOmics::plsda(X, y, ncomp = 2)
+train_scores_final <- plsda_final$variates$X[, 1:2, drop = FALSE]
+
+# ---- Project external data ----
+test_pred_unc <- predict(plsda_final, X_unc)
+
+# ---- Fit KNN on final PLSDA scores ----
+knn_final <- knn3(train_scores_final, y, k = 9)
+
+# ---- Predict external samples ----
+prob_unc <- predict(knn_final, test_pred_unc$variates, type = "prob")
+
+# Save results
+# If prob_unc is a matrix or data frame of probabilities:
+preds_unc <- apply(prob_unc, 1, function(row) {
+  colnames(prob_unc)[which.max(row)]
+})
+
+# Convert to factor with same levels as training response
+preds_unc <- factor(preds_unc, levels = levels(y))
+
+# Combine into a data.frame
+results_unc <- data.frame(
+  library_id = dat2_unc$library_id,   # adjust to your column name
+  predicted_class = preds_unc,
+  prob_IPF = prob_unc[, "IPF"],
+  prob_nonIPF = prob_unc[, "nonIPF"]
+)
+
+print(results_unc)
+
+write.csv(results_unc, "results_unc.csv")
+```
+
+```{r}
+library(ggplot2)
+library(dplyr)
+
+# --- Training scores ---
+train_scores <- plsda_final$variates$X[, 1:2, drop = FALSE] %>%
+  as.data.frame() %>%
+  rename(comp1 = 1, comp2 = 2) %>%
+  mutate(
+    category = y,       # true diagnosis
+    set = "No"       # mark as training
+  )
+
+# --- Test scores (projection of test data) ---
+test_scores <- as.data.frame(test_pred_unc$variates[, 1:2, drop = FALSE]) %>%
+  rename(comp1 = 1, comp2 = 2) %>%
+  mutate(
+    category = results_unc$predicted_class,  # predicted class label
+    set = "Yes"
+  )
+
+# --- Combine ---
+plot_df <- bind_rows(train_scores, test_scores)
+```
+
+```{r, fig.height = 4, fig.width=4}
+# --- Plot ---
+ggplot(plot_df, aes(x = comp1, y = comp2)) +
+  geom_point(aes(fill = category, shape = set), size = 3) +
+  scale_shape_manual(values = c('No' = 21, 'Yes' = 24), breaks = c("No", "Yes")) +  # circles for train, triangle for test
+  scale_fill_manual(values = c(IPF = "#3c67a4", nonIPF = "plum3")) +
+  theme_bw() +
+  labs(
+    x = "PLS-DA Component 1",
+    y = "PLS-DA Component 2",
+    fill = "Diagnosis",
+    shape = "Set"
+  ) +
+  theme(
+    aspect.ratio = 1,
+    # grid lines can be controversial, in my field it's not seen often
+    panel.grid.minor=element_blank(), 
+    panel.grid.major=element_blank(),
+    axis.text = element_text(color="black",size=14), # default font size is too small
+    #axis.text.x = element_text(size = 14,hjust = 0.5),
+    axis.ticks = element_line(colour="black", linewidth = 1), # just plain old black please
+    axis.title = element_text(size=14), # default font size is too small
+    legend.title=element_text(size=14, vjust=0.5, hjust=0.5),
+    legend.text=element_text(size=14, vjust=0.5, hjust=0),
+    plot.margin=unit(c(1,1,1,1),"mm"),
+    plot.background=element_rect(fill="transparent", colour=NA),
+    panel.border = element_rect(colour="black", linewidth = 1), # I like to draw a crisp border
+    panel.background=element_rect(fill="transparent", colour=NA),
+    legend.background=element_rect(fill="transparent", colour=NA),
+    legend.box.background=element_rect(fill="transparent", colour=NA),
+    legend.key=element_rect(fill="transparent", colour=NA),
+    legend.position = 'bottom')+
+  guides(
+    fill = guide_legend(title = "Diagnosis", 
+                        title.position = 'top',
+                        override.aes = list(shape = 21, breaks = c("IPF","nonIPF")),
+                        nrow =2
+    ),
+    shape = guide_legend(title = "Unclassified?",
+                         title.position = 'top',
+                         nrow = 2)
+  )
+```
+
+```{r}
+library(survival)
+library(ggsurvfit)
+library(gtsummary)
+
+
+df <- results_unc %>%
+  select(-prob_IPF, -prob_nonIPF) 
+metadata <- read_excel("/Users/jk/Documents/Lab2/visium/python_analysis/lambda/metadata_batch_effect.xlsx") %>%
+  filter(library_id %in% df$library_id)
+df_final <- df %>% 
+  left_join(metadata) %>% 
+  select(library_id, predicted_class, outcome_long, tte_long, age, sex, bmi, FVC) %>% 
+  mutate(outcome_long = recode(outcome_long, "ALIVE" = 0, "LTx" = 1, "DEAD" = 1)) %>%
+  mutate(FVC = as.numeric(FVC))
+
+s1 <- survfit(Surv(tte_long, outcome_long) ~1, data = df_final)
+
+
+survfit2(Surv(tte_long, outcome_long) ~1, data = df_final) %>%
+  ggsurvfit()
+
+
+
+survdiff(Surv(tte_long, outcome_long)~predicted_class, data = df_final)
+
+
+km_plot <- survfit2(Surv(tte_long, outcome_long) ~ predicted_class, data = df_final) %>%
+  ggsurvfit(linewidth = 0.7) +
+  scale_ggsurvfit() +
+  add_censor_mark(size = 2, alpha = 1) +
+  add_pvalue(location = "annotation", caption = "log rank test \n{p.value}",
+             x = 20, y = 0.10, size = 5) +
+  theme_bw() +
+  theme(panel.grid.minor=element_blank(),
+        panel.grid.major=element_blank(),
+        axis.text = element_text(color="black",size=14),
+        axis.ticks = element_line(colour="black"),
+        axis.title = element_text(size=14),
+        #legend.position="none",
+        legend.title=element_text(size=14, vjust=0.5, hjust=0.5),
+        #legend.title=element_blank(),
+        legend.text=element_text(size=14, vjust=0.5, hjust=0),
+        plot.margin=unit(c(1,1,1,1),"mm"),
+        plot.background=element_rect(fill="transparent", colour=NA),
+        panel.border = element_rect(colour="black", linewidth = 1),
+        panel.background=element_rect(fill="transparent", colour=NA),
+        legend.background=element_rect(fill="transparent", colour=NA),
+        legend.box.background=element_rect(fill="transparent", colour=NA),
+        legend.key=element_rect(fill="transparent", colour=NA),
+        legend.position = 'bottom',
+        aspect.ratio=1) +
+  scale_colour_manual(
+    values = c("black", "blue2")
+  ) + 
+  labs(x = "Time (months)", y = "LTx-free survival", colour = "Prediction")
+
+library(labelled)
+var_label(df_final) <- list(
+  predicted_class = "Prediction",
+  age = "Age",
+  sex = "Sex",
+  bmi = "BMI"
+)
+
+cox_res <- coxph(Surv(tte_long, outcome_long) ~ predicted_class + age + sex + bmi, data = df_final)
+
+cox_res %>%
+  tbl_regression(exp = T) %>%
+  bold_labels() %>%
+  bold_p(t = 0.05) %>% 
+  as_gt() %>%
+  gt::gtsave("tbl_cox_output.png")
+
+
+# testing cox assumptions
+
+cox.zph(cox_res)
+```
+```{r, fig.height=4, fig.width=4}
+km_plot
+```
