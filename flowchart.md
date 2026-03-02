@@ -1,11 +1,9 @@
-
- 
- ```mermaid
+```mermaid
 ---
 config:
   layout: elk
   look: neo
-  theme: default
+  theme: forest
 ---
 flowchart TD;
     %%f1
@@ -13,14 +11,15 @@ flowchart TD;
     %%sf2 
     filter_df.xlsx-->blocks_age_vs_median_genes.ipynb; 
     %%f1
-    metadata.xlsx-->or_by_cond.Rmd; 
+    metadata_batch_effect.xlsx-->or_by__cond.Rmd; 
 
 
     misc_import([import.ipynb])--adata_filtered_concat.h5ad-->misc_create1([create_and_apply_sc_model_ihla_disease_subset_ann_finest_level.ipynb]);
     misc_import--adata_filtered_concat.h5ad-->misc_create2([create_and_apply_sc_model_ihla_study_subset_Banovich_Kropski_2020.ipynb]);
 
-    SOMETHING--adata_ref_disease.h5ad-->misc_create1;
-    SOMETHING2--adata_ref_disease_Banovich_Kropski_2020.h5ad-->misc_create2;
+    ihla.h5ad-->misc_ihla_disease_subset.ipynb([ihla_disease_subset.ipynb])
+    misc_ihla_disease_subset.ipynb--adata_ref_disease.h5ad-->misc_create1;
+    misc_ihla_disease_subset.ipynb--adata_ref_disease_Banovich_Kropski_2020.h5ad-->misc_create2;
     %%sf2
     misc_import--adata_concat.h5ad-->qc_unfiltered_v_filtered.ipynb; 
     %%sf2
@@ -48,18 +47,18 @@ flowchart TD;
 
     
     %%sf3
-    boxplot_normalized_to_ann_finest_level.ipynb--ann_finest_level_abs_cell_count.xlsx-->corr_bw_spots.ipynb;
+    boxplot_normalized_to_ann_finest_level.ipynb--"ann_finest_level_abs_cell_count.xlsx"-->corr_bw_spots.ipynb;
     %%sf3
-    boxplot_normalized_to_total_cell_abundance_Banovich_Kropski_2020.ipynb--Banovich_Kropski_2020_abs_cell_count.xlsx-->corr_bw_spots.ipynb; 
+    boxplot_normalized_to_total_cell_abundance_Banovich_Kropski_2020.ipynb--"Banovich_Kropski_2020_abs_cell_count.xlsx"-->corr_bw_spots.ipynb; 
 
 
     
 
     cell2location_nmf_nfact12.ipynb--adata_vis_assigned_cell_types_nfact12.h5ad-->misc_logminmax([cell2location_nmf_nfact12_per_factor_logminmax.ipynb]);
-    misc_cell2location_nmf--../models-->misc_logminmax;
+    misc_cell2location_nmf--./models-->misc_logminmax;
 
      %%f2
-    misc_cell2location_nmf--adata_vis_assigned_cell_types_nfact12.h5ad,../models/-->cell2location_nmf_nfact12.ipynb;
+    misc_cell2location_nmf--adata_vis_assigned_cell_types_nfact12.h5ad,./models/-->cell2location_nmf_nfact12.ipynb;
      %%f2
     misc_logminmax--adata_vis_assigned_cell_types_nfact12_assigned_factors_log_minmax.h5ad-->niche_assignment_nmf_weights_log_minmax.ipynb; 
      %%f2
@@ -75,7 +74,7 @@ flowchart TD;
     misc_logminmax--adata_vis_assigned_cell_types_nfact12_assigned_factors_log_minmax.h5ad-->boxplot_NMF_weights_log_minmax_norm_niches_by_cond_averaged.ipynb;
     cell2location_nmf_nfact12.ipynb--adata_vis_assigned_cell_types_nfact12.h5ad-->boxplot_NMF_weights_niches_by_cond_averaged.ipynb;
     misc_logminmax--adata_vis_assigned_cell_types_nfact12_assigned_factors_log_minmax.h5ad-->dotplot.ipynb;
-    misc_logminmax--adata_vis_assigned_cell_types_nfact12_assigned_factors_log_minmax.h5ad-->niche_assignment_nmf_weights_log_minmax.ipynb;
+    %%misc_logminmax--adata_vis_assigned_cell_types_nfact12_assigned_factors_log_minmax.h5ad-->niche_assignment_nmf_weights_log_minmax.ipynb;
     misc_logminmax--adata_vis_assigned_cell_types_nfact12_assigned_factors_log_minmax.h5ad-->niche_assignment_nmf_weights.ipynb;
     misc_logminmax--adata_vis_assigned_cell_types_nfact12_assigned_factors_log_minmax.h5ad-->stacked_bar_individual_log_minmax.ipynb;
      %%sf6
@@ -87,7 +86,8 @@ flowchart TD;
 
 
     %% sf6/venn.Rmd
-    misc_pseudobulk_by_niche([pseudobulk_by_niche_library_id.ipynb])--pseudobulk_by_niche_min_spots_5p_library_id.h5ad-->misc_loop_dds.R([loop_dds.R])
+    misc_logminmax--adata_vis_assigned_cell_types_nfact12_assigned_factors_log_minmax.h5ad-->misc_pseudobulk_by_niche([pseudobulk_by_niche_library_id.ipynb])
+    misc_pseudobulk_by_niche--pseudobulk_by_niche_min_spots_5p_library_id.h5ad-->misc_loop_dds.R([loop_dds.R])
     misc_loop_dds.R-->venn.Rmd
     %% sf6.venn.Rmd
     SVGs_correlation_with_niches.ipynb--niche_gene_overlap_fdr_cutoff_005_I_cutoff_0_moranI_top75_niche.npz-->misc_fdr([fdr_topn_SVGs_by_niche.ipynb])
@@ -120,11 +120,11 @@ flowchart TD;
     %% f6
     metadata_batch_effect.xlsx-->misc_import_spCLUE_no_UNC([import_for_spCLUE_labelled_samples.ipynb])
     misc_import_spCLUE_no_UNC--adata_filtered_concat_no_UNC_spCLUE_n_clusters_?.h5ad-->misc_extract_no_UNC([extract_obs_mclust_no_UNC.ipynb])
-    misc_extract_no_UNC--mclust_?_no_UNC.csv,mclust_refined_?_no_UNC.csv-->spatial_niche_assignment.ipynb
+    misc_extract_no_UNC--mclust_?\_no_UNC.csv,mclust_refined_?\_no_UNC.csv-->spatial_niche_assignment.ipynb
     
     %% f6
     misc_logminmax--adata_vis_assigned_cell_types_nfact12_assigned_factors_log_minmax.h5ad-->export_prop_no_unc.ipynb
-    misc_extract_no_UNC--mclust_?_no_UNC.csv,mclust_refined_?_no_UNC.csv-->export_prop_no_unc.ipynb
+    misc_extract_no_UNC--mclust_?\_no_UNC.csv,mclust_refined_?\_no_UNC.csv-->export_prop_no_unc.ipynb
 
     %% f6
     library_to_cond.csv-->pls_da_knn.Rmd
@@ -134,7 +134,7 @@ flowchart TD;
     metadata_batch_effect.xlsx-->misc_import_spCLUE_UNC([import_for_spCLUE_unlabelled_samples.ipynb])
     misc_import_spCLUE_UNC--adata_filtered_concat_only_UNC_spCLUE_n_clusters_?.h5ad-->misc_extract_UNC([extract_obs_mclust_only_UNC.ipynb])
 
-    misc_extract_UNC--mclust_?_only_UNC.csv,mclust_refined_?_only_UNC.csv-->misc_export_prop_only_unc.ipynb([export_prop_only_unc.ipynb])
+    misc_extract_UNC--mclust_?\_only_UNC.csv,mclust_refined_?\_only_UNC.csv-->misc_export_prop_only_unc.ipynb([export_prop_only_unc.ipynb])
 
     library_to_cond.csv-->pls_da_knn.Rmd
     export_prop_no_unc.ipynb--prop_no_unc_mclust_refined_?.csv-->pls_da_knn_unclassified.Rmd
@@ -143,8 +143,8 @@ flowchart TD;
     %%f7/pls_roc.ipynb
     spaceranger_input/svs-->misc_run_batch_task_all_svs_256px.sh([run_batch_task_all_svs_256px.sh])
     list_of_wsis.csv-->misc_run_batch_task_all_svs_256px.sh
-    misc_run_batch_task_all_svs_256px.sh--features_uni_v2/-->misc_ABIL_epoch_*_*.ipynb([ABMIL_epoch_*_*.ipynb])
-    misc_ABIL_epoch_*_*.ipynb--epoch_*_*_results.npz-->pl_roc.ipynb
+    misc_run_batch_task_all_svs_256px.sh--features_uni_v2/-->misc_ABIL_epoch_?\_?.ipynb([ABMIL_epoch_?\_?.ipynb])
+    misc_ABIL_epoch_?\_?.ipynb--epoch_?\_?\_results.npz-->pl_roc.ipynb
     library_to_cond.csv-->pl_roc.ipynb
 
     %% f7/pls_da_knn_cpath.Rmd
@@ -153,7 +153,7 @@ flowchart TD;
     misc_run_logistic_classifier_200px.ipynb--all_sample_proportions_200px.csv-->pls_da_knn_cpath.Rmd
 
     misc_logminmax--adata_vis_assigned_cell_types_nfact12_assigned_factors_log_minmax.h5ad-->misc_extract_patches_various.ipynb([extract_patches_various.ipynb])
-    misc_extract_no_UNC--mclust_?_no_UNC.csv,mclust_refined_?_no_UNC.csv-->misc_extract_patches_various.ipynb
+    misc_extract_no_UNC--mclust_?\_no_UNC.csv,mclust_refined_?\_no_UNC.csv-->misc_extract_patches_various.ipynb
     spaceranger_input/tiff-->misc_extract_patches_various.ipynb
 
     misc_extract_patches_various.ipynb--visium_patches/-->misc_uni2_100um.ipynb([uni2_100um.ipynb])

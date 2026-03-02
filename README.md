@@ -5,5 +5,5 @@ This repo contains code for [paper]().
 
 "misc" dicrectory contains all other code indirectly processing files required to run code in files in "figs".  
 
-flowchart.md is a Mermaid diagram that depicts a rather complex relationship between scripts. Square and round nodes correspond to scripts in the "fig" and "misc" directory, respectively. Text between nodes indicate output file(s) created by the upstream node and used by the downstream node.  
+flowchart.md is a Mermaid diagram that depicts a rather complex relationship between scripts. Square and round nodes correspond to scripts in the "fig" and "misc" directory, respectively. Text between nodes indicate output file(s) created by the upstream node and used by the downstream node. `?` indicates a wildcard character of any length.   
 

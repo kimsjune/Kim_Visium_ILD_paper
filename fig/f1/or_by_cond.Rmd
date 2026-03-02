@@ -18,7 +18,7 @@ library(tidyr)          # for handling missing data
 library(janitor)        # optional: for cleaning column names
 
 # Read data
-metadata <- read_excel("/Users/jk/Documents/Lab2/visium/python_analysis/lambda/metadata.xlsx") %>%
+metadata <- read_excel("/Users/jk/Documents/Lab2/visium/python_analysis/lambda/metadata_batch_effect.xlsx") %>%
   clean_names()  # makes column names lowercase and underscores
 
 # Check data
