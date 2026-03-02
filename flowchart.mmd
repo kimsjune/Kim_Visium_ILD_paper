@@ -1,0 +1,181 @@
+```mermaid
+---
+config:
+  layout: elk
+  look: neo
+  theme: forest
+---
+flowchart TD;
+    %%f1
+    filter_df.xlsx-->genes_spots_boxplots.ipynb; 
+    %%sf2 
+    filter_df.xlsx-->blocks_age_vs_median_genes.ipynb; 
+    %%f1
+    metadata_batch_effect.xlsx-->or_by__cond.Rmd; 
+
+
+    misc_import([import.ipynb])--adata_filtered_concat.h5ad-->misc_create1([create_and_apply_sc_model_ihla_disease_subset_ann_finest_level.ipynb]);
+    misc_import--adata_filtered_concat.h5ad-->misc_create2([create_and_apply_sc_model_ihla_study_subset_Banovich_Kropski_2020.ipynb]);
+
+    ihla.h5ad-->misc_ihla_disease_subset.ipynb([ihla_disease_subset.ipynb])
+    misc_ihla_disease_subset.ipynb--adata_ref_disease.h5ad-->misc_create1;
+    misc_ihla_disease_subset.ipynb--adata_ref_disease_Banovich_Kropski_2020.h5ad-->misc_create2;
+    %%sf2
+    misc_import--adata_concat.h5ad-->qc_unfiltered_v_filtered.ipynb; 
+    %%sf2
+    misc_import--adata_filtered_concat.h5ad-->qc_unfiltered_v_filtered.ipynb; 
+
+    misc_create1-->misc_assign[cell2location_assign_cell_types_loop.ipynb];
+    misc_create2-->misc_assign;
+
+    %%f1
+    misc_assign--adata_vis_assigned_cell_types_ann_finiest_level.h5ad-->spatial_plot_ct_gene_pairs.ipynb; 
+    %%f1
+    misc_assign--adata_vis_assigned_cell_types_ann_finiest_level.h5ad-->boxplot_normalized_to_ann_finest_level.ipynb;
+    %%f1
+    misc_assign--adata_vis_assigned_cell_types_ann_finiest_level.h5ad-->dotplot_ann_finest.ipynb;
+    %%f1
+    misc_assign--adata_vis_assigned_cell_types_ann_finiest_level.h5ad-->f1_rep_he.ipynb;
+    %%f1
+    misc_assign--adata_vis_assigned_cell_types_ann_finiest_level.h5ad-->misc_cell2location_nmf([cell2location_nmf_ann_finest_level.ipynb]);
+
+    %%sf3
+    misc_assign--adata_vis_assigned_cell_types_Banovich_Kropski_2020.h5ad-->boxplot_normalized_to_total_cell_abundance_Banovich_Kropski_2020.ipynb; 
+    %%sf3
+    misc_assign--adata_vis_assigned_cell_types_Banovich_Kropski_2020.h5ad-->f2_dotpot.ipynb;
+
+
+    
+    %%sf3
+    boxplot_normalized_to_ann_finest_level.ipynb--"ann_finest_level_abs_cell_count.xlsx"-->corr_bw_spots.ipynb;
+    %%sf3
+    boxplot_normalized_to_total_cell_abundance_Banovich_Kropski_2020.ipynb--"Banovich_Kropski_2020_abs_cell_count.xlsx"-->corr_bw_spots.ipynb; 
+
+
+    
+
+    cell2location_nmf_nfact12.ipynb--adata_vis_assigned_cell_types_nfact12.h5ad-->misc_logminmax([cell2location_nmf_nfact12_per_factor_logminmax.ipynb]);
+    misc_cell2location_nmf--./models-->misc_logminmax;
+
+     %%f2
+    misc_cell2location_nmf--adata_vis_assigned_cell_types_nfact12.h5ad,./models/-->cell2location_nmf_nfact12.ipynb;
+     %%f2
+    misc_logminmax--adata_vis_assigned_cell_types_nfact12_assigned_factors_log_minmax.h5ad-->niche_assignment_nmf_weights_log_minmax.ipynb; 
+     %%f2
+    misc_logminmax--adata_vis_assigned_cell_types_nfact12_assigned_factors_log_minmax.h5ad-->niches_auto_corr_svg.ipynb; 
+     %%f2
+    misc_logminmax--adata_vis_assigned_cell_types_nfact12_assigned_factors_log_minmax.h5ad-->stacked_bar_log_minmax.ipynb; 
+    %%f3
+    misc_logminmax--adata_vis_assigned_cell_types_nfact12_assigned_factors_log_minmax.h5ad-->SVGs_correlation_with_niches.ipynb; 
+    
+    
+    
+    %%sf4
+    misc_logminmax--adata_vis_assigned_cell_types_nfact12_assigned_factors_log_minmax.h5ad-->boxplot_NMF_weights_log_minmax_norm_niches_by_cond_averaged.ipynb;
+    cell2location_nmf_nfact12.ipynb--adata_vis_assigned_cell_types_nfact12.h5ad-->boxplot_NMF_weights_niches_by_cond_averaged.ipynb;
+    misc_logminmax--adata_vis_assigned_cell_types_nfact12_assigned_factors_log_minmax.h5ad-->dotplot.ipynb;
+    %%misc_logminmax--adata_vis_assigned_cell_types_nfact12_assigned_factors_log_minmax.h5ad-->niche_assignment_nmf_weights_log_minmax.ipynb;
+    misc_logminmax--adata_vis_assigned_cell_types_nfact12_assigned_factors_log_minmax.h5ad-->niche_assignment_nmf_weights.ipynb;
+    misc_logminmax--adata_vis_assigned_cell_types_nfact12_assigned_factors_log_minmax.h5ad-->stacked_bar_individual_log_minmax.ipynb;
+     %%sf6
+    misc_cell2location_nmf--adata_vis_assigned_cell_types_nfact12.h5ad-->perib_fb_spatial_plots.ipynb;
+    %%sf6
+    misc_logminmax--adata_vis_assigned_cell_types_nfact12_assigned_factors_log_minmax.h5ad-->misc_pseudobulk_all([pseudobulk_all.ipynb])
+    misc_pseudobulk_all--pseudobulk_all.h5ad-->pb_all_sf6.Rmd
+    metadata_batch_effect.xlsx-->pb_all_sf6.Rmd
+
+
+    %% sf6/venn.Rmd
+    misc_logminmax--adata_vis_assigned_cell_types_nfact12_assigned_factors_log_minmax.h5ad-->misc_pseudobulk_by_niche([pseudobulk_by_niche_library_id.ipynb])
+    misc_pseudobulk_by_niche--pseudobulk_by_niche_min_spots_5p_library_id.h5ad-->misc_loop_dds.R([loop_dds.R])
+    misc_loop_dds.R-->venn.Rmd
+    %% sf6.venn.Rmd
+    SVGs_correlation_with_niches.ipynb--niche_gene_overlap_fdr_cutoff_005_I_cutoff_0_moranI_top75_niche.npz-->misc_fdr([fdr_topn_SVGs_by_niche.ipynb])
+    misc_fdr--shared_genes_by_niche.json-->venn.Rmd
+
+    %% f4/corr.Rmd
+    misc_loop_dds.R-->corr.Rmd
+    misc_fdr--niche_gene_overlap.json-->corr.Rmd
+
+    %% f4/enrichGO_up.Rmd
+    misc_loop_dds.R-->enrichGO_up.Rmd
+    %% f4/loop_volcano.Rmd
+    misc_loop_dds.R-->loop_volcano.Rmd
+
+    %% f4/pb_all.Rmd
+    misc_pseudobulk_all--pseudobulk_all.h5ad-->pb_all.Rmd
+    metadata_batch_effect.xlsx-->pb_all.Rmd
+
+    %% f4/pseudobulk_niche_min_spots_5p_library_id.Rmd
+    misc_pseudobulk_by_niche--pseudobulk_by_niche_min_spots_5p_library_id.h5ad-->pseudobulk_niche_min_spots_5p_library_id.Rmd
+
+    %% f5/combinatorial_interfaces.ipynb
+    misc_logminmax--adata_vis_assigned_cell_types_nfact12_assigned_factors_log_minmax.h5ad-->combinatorial_interface.ipynb
+
+    %% sf7
+    adata_vis_human_spatial_paper.h5ad-->mayr_combinatorial_interfaces.ipynb
+
+    %% f6
+    misc_logminmax--adata_vis_assigned_cell_types_nfact12_assigned_factors_log_minmax.h5ad-->spatial_niche_assignment.ipynb
+    %% f6
+    metadata_batch_effect.xlsx-->misc_import_spCLUE_no_UNC([import_for_spCLUE_labelled_samples.ipynb])
+    misc_import_spCLUE_no_UNC--adata_filtered_concat_no_UNC_spCLUE_n_clusters_?.h5ad-->misc_extract_no_UNC([extract_obs_mclust_no_UNC.ipynb])
+    misc_extract_no_UNC--mclust_?\_no_UNC.csv,mclust_refined_?\_no_UNC.csv-->spatial_niche_assignment.ipynb
+    
+    %% f6
+    misc_logminmax--adata_vis_assigned_cell_types_nfact12_assigned_factors_log_minmax.h5ad-->export_prop_no_unc.ipynb
+    misc_extract_no_UNC--mclust_?\_no_UNC.csv,mclust_refined_?\_no_UNC.csv-->export_prop_no_unc.ipynb
+
+    %% f6
+    library_to_cond.csv-->pls_da_knn.Rmd
+    export_prop_no_unc.ipynb--prop_no_unc_mclust_refined_?.csv-->pls_da_knn.Rmd
+
+    %% f6/pls_da_knn.Rmd
+    metadata_batch_effect.xlsx-->misc_import_spCLUE_UNC([import_for_spCLUE_unlabelled_samples.ipynb])
+    misc_import_spCLUE_UNC--adata_filtered_concat_only_UNC_spCLUE_n_clusters_?.h5ad-->misc_extract_UNC([extract_obs_mclust_only_UNC.ipynb])
+
+    misc_extract_UNC--mclust_?\_only_UNC.csv,mclust_refined_?\_only_UNC.csv-->misc_export_prop_only_unc.ipynb([export_prop_only_unc.ipynb])
+
+    library_to_cond.csv-->pls_da_knn.Rmd
+    export_prop_no_unc.ipynb--prop_no_unc_mclust_refined_?.csv-->pls_da_knn_unclassified.Rmd
+    misc_export_prop_only_unc.ipynb--prop_only_unc_mclust_refined_?.csv-->pls_da_knn_unclassified.Rmd
+
+    %%f7/pls_roc.ipynb
+    spaceranger_input/svs-->misc_run_batch_task_all_svs_256px.sh([run_batch_task_all_svs_256px.sh])
+    list_of_wsis.csv-->misc_run_batch_task_all_svs_256px.sh
+    misc_run_batch_task_all_svs_256px.sh--features_uni_v2/-->misc_ABIL_epoch_?\_?.ipynb([ABMIL_epoch_?\_?.ipynb])
+    misc_ABIL_epoch_?\_?.ipynb--epoch_?\_?\_results.npz-->pl_roc.ipynb
+    library_to_cond.csv-->pl_roc.ipynb
+
+    %% f7/pls_da_knn_cpath.Rmd
+    library_to_cond_concat_wo_unc.csv-->pls_da_knn_cpath.Rmd
+    misc_run_batch_task_all_wsi_svs_200px.sh([run_batch_task_all_wsi_svs_200px.sh])--features_uni_v2/-->misc_run_logistic_classifier_200px.ipynb([run_logistic_classifier_200px.ipynb])
+    misc_run_logistic_classifier_200px.ipynb--all_sample_proportions_200px.csv-->pls_da_knn_cpath.Rmd
+
+    misc_logminmax--adata_vis_assigned_cell_types_nfact12_assigned_factors_log_minmax.h5ad-->misc_extract_patches_various.ipynb([extract_patches_various.ipynb])
+    misc_extract_no_UNC--mclust_?\_no_UNC.csv,mclust_refined_?\_no_UNC.csv-->misc_extract_patches_various.ipynb
+    spaceranger_input/tiff-->misc_extract_patches_various.ipynb
+
+    misc_extract_patches_various.ipynb--visium_patches/-->misc_uni2_100um.ipynb([uni2_100um.ipynb])
+    misc_uni2_100um.ipynb--niche_classifier_final_uni2_100um.joblib-->misc_run_logistic_classifier_200px.ipynb
+
+    %% sf8/f1_barplot.ipynb
+    %% misc_extract_patches_various.ipynb--visium_patches/-->misc_uni2_100um.ipynb([uni2_100um.ipynb])
+    misc_extract_patches_various.ipynb--visium_patches/-->misc_uni2_55um.ipynb([uni2_55um.ipynb])
+    misc_extract_patches_various.ipynb--visium_patches/-->misc_virchow2_100um.ipynb([virchow2_100um.ipynb])
+    misc_extract_patches_various.ipynb--visium_patches/-->misc_virchow2_55um.ipynb([virchow2_55um.ipynb])
+    misc_extract_patches_various.ipynb--visium_patches/-->misc_uni_100um.ipynb([uni_100um.ipynb])
+    misc_extract_patches_various.ipynb--visium_patches/-->misc_uni_55um.ipynb([uni_55um.ipynb])
+    misc_extract_patches_various.ipynb--visium_patches/-->misc_virchow_100um.ipynb([virchow_100um.ipynb])
+    misc_extract_patches_various.ipynb--visium_patches/-->misc_virchow_55um.ipynb([virchow_55um.ipynb])
+    
+    misc_uni2_100um.ipynb-->f1_barplot.ipynb
+    misc_uni2_55um.ipynb-->f1_barplot.ipynb
+    misc_virchow2_100um.ipynb-->f1_barplot.ipynb
+    misc_virchow2_55um.ipynb-->f1_barplot.ipynb
+    misc_uni_100um.ipynb-->f1_barplot.ipynb
+    misc_uni_55um.ipynb-->f1_barplot.ipynb
+    misc_virchow_100um.ipynb-->f1_barplot.ipynb
+    misc_virchow_55um.ipynb-->f1_barplot.ipynb
+
+ ```
