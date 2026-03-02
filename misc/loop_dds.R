@@ -1,0 +1,157 @@
+library(readxl)
+library(Seurat)
+library(edgeR)
+library(zellkonverter)
+library(scater)
+library(scran)
+library(BiocParallel)
+library(BiocSingular)
+library(patchwork)
+library(batchelor)
+library(ggh4x)
+library(RColorBrewer)
+library(ComplexHeatmap)
+library(DESeq2)
+library(dplyr)
+library(stringr)
+library(ggrepel)
+library(ggpp)
+library(cowplot)
+
+file <- "/Users/jk/Documents/Lab2/visium/python_analysis/local_401/nmf/ann_finest_level/nfact12/h5ad/pseudobulk_by_niche_min_spots_5p_library_id.h5ad"
+pb <- readH5AD(file, X_name = "counts", use_hdf5 = TRUE)
+
+# metadata <- read_excel("/Users/jk/Documents/Lab2/visium/python_analysis/lambda/metadata_batch_effect.xlsx")
+# metadata <- metadata[!metadata$library_id == '20_17478_A1',]
+# 
+# colData(pb)$seq_batch <-factor(metadata$seq_batch)
+# colData(pb)$probe_date <- factor(metadata$probe_date)
+# colData(pb)$probe_group <- factor(metadata$probe_group)
+# colData(pb)$training_batch <- factor(colData(pb)$training_batch)
+# colData(pb)$sex <- factor(colData(pb)$sex, levels = c("M","F"))
+
+colData(pb)$niche <- factor(colData(pb)$niche, levels = c('ATI/Endo', 'Alv. FB/immune', 'Plasma', 'SMC', 'ATII', 'Immune', 'Airway', 'Adv. FB', 'Perib. FB', 'Alv. macro', 'Macro', 'B'))
+
+dds <- DESeqDataSetFromMatrix(countData = counts(pb), colData = colData(pb), design = ~ niche)
+dds <- DESeq(dds, test = "LRT", reduced = ~1)
+res <- results(dds)
+resOrdered <- res[order(res$padj),]
+resOrdered
+
+
+
+# vsd <- vst(dds, blind=FALSE)
+# #
+# #
+# pcaData <- plotPCA(vsd, intgroup=c("cond","niche", "sex", "seq_batch", "probe_date", "probe_group", 'outcome_24m'), returnData=TRUE)
+# pcaData$cond <- factor(pcaData$cond, levels = c("IPF","NSIP","CHP","UNC"))
+# percentVar <- round(100 * attr(pcaData, "percentVar"))
+# 
+# dir_path <- "figs"
+# if (!dir.exists(dir_path)) {
+#   dir.create(dir_path)
+# }
+# 
+# ggplot(pcaData, aes(PC1, PC2)) +
+#   geom_point(aes(shape = cond, fill = niche), size = 3, color = "black", stroke = 0.5) +
+#   scale_shape_manual(values = c("IPF"=21, "NSIP"=22, "CHP"=23))+
+#   #geom_text_repel(aes(label=name), size=4, max.overlaps = 50) +
+#   scale_fill_manual("Niche", values = c('#ff7f00', '#ffff99', '#1f78b4', '#e31a1c', '#fdbf6f', '#a6cee3', '#fb9a99', '#b15928', '#33a02c', '#6a3d9a', '#b2df8a', '#cab2d6')) +
+#   xlab(paste0("PC1: ", percentVar[1], "% variance")) +
+#   ylab(paste0("PC2: ", percentVar[2], "% variance")) +
+#   coord_fixed() +
+#   theme_bw() +
+#   theme(
+#     panel.grid.minor = element_blank(),
+#     panel.grid.major = element_blank(),
+#     axis.text = element_text(color = "black", size = 14),
+#     axis.ticks = element_line(colour = "black"),
+#     axis.title = element_text(size = 14),
+#     legend.title = element_text(size = 14, vjust = 0.5, hjust = 0.5),
+#     legend.text = element_text(size = 14, vjust = 0.5, hjust = 0),
+#     plot.margin = unit(c(1, 1, 1, 1), "mm"),
+#     plot.background = element_rect(fill = "transparent", colour = NA),
+#     panel.border = element_rect(colour = "black"),
+#     panel.background = element_rect(fill = "transparent", colour = NA),
+#     legend.background = element_rect(fill = "transparent", colour = NA),
+#     legend.box.background = element_rect(fill = "transparent", colour = NA),
+#     legend.margin = margin(t = 0, r = 0, b = 0, l = 0, unit = "mm"),
+#     legend.key = element_rect(fill = "transparent", colour = NA),
+#     legend.position = "bottom",
+#     legend.box = "vertical",
+#     aspect.ratio = 1
+#   ) +
+#   guides(
+#     shape = guide_legend(title = "Diagnosis"),
+#     fill = guide_legend(nrow = 5, title = "Niche",
+#                         override.aes = list(shape = 21, colour = "black",
+# 
+#                                             fill = c('#ff7f00', '#ffff99', '#1f78b4', '#e31a1c', '#fdbf6f', '#a6cee3', '#fb9a99', '#b15928', '#33a02c', '#6a3d9a', '#b2df8a', '#cab2d6')))
+#   )
+# ggsave("figs/pb_by_niche_min_spots_5p_library_id.pdf",  height = 5, width = 5.5, bg = "transparent")
+
+
+### DESeq2
+dir.create("DE_results_5p", showWarnings = FALSE)
+
+# Get unique conditions and niches
+# conds <- colData(pb)$cond %>% unique()
+niches <- colData(pb)$niche %>% unique()
+
+# Initialize list to store DEG summary
+deg_summary <- data.frame(
+  # condition = character(),
+  niche = character(),
+  n_sig_genes = integer(),
+  n_sig_logFC_genes = integer(),
+  stringsAsFactors = FALSE
+)
+
+
+# To save niche-subset dds
+dds_list <- list()
+res_list <- list()
+# Loop through each niche within that condition
+for (niche in niches) {
+  # Skip if niche is not present in this subset
+  if (!niche %in% colData(pb)$niche) next
+  
+  pb_niche <- pb
+  
+  # Create binary variable: target niche vs. others
+  niche_group <- ifelse(pb_niche$niche == niche, as.character(niche), "Other")
+  pb_niche$niche_group <- factor(niche_group, levels = c("Other",as.character(niche)))
+  
+  # Convert to DESeqDataSet
+  dds <- DESeqDataSetFromMatrix(countData = counts(pb_niche), colData = colData(pb_niche), design = ~ niche_group)
+  # Run DESeq
+  dds <- DESeq(dds)
+  dds_list[[niche]] <- dds
+  
+  
+  # Extract results
+  res <- results(dds, contrast = c("niche_group", as.character(niche), "Other"))
+  res_list[[niche]] <- res
+  # Save results
+  fname <- paste0("res_", "_", 
+                  gsub("_+", "_", # collapse multiple _ into just one
+                       gsub("[^A-Za-z0-9]", "_", niche)), # nested gsub!
+                  "_vs_rest.csv")
+  write.csv(as.data.frame(res[order(res$padj),]), file = file.path("DE_results_5p", fname))
+  
+  # Count significant DEGs
+  n_sig <- sum(res$padj < 0.05, na.rm = TRUE)
+  
+  # Add to summary table
+  deg_summary <- rbind(deg_summary, data.frame(
+    #condition = cond,
+    niche = as.character(niche),
+    n_sig_genes = n_sig,
+    n_sig_logFC_genes = sum(res$padj < 0.05 & abs(res$log2FoldChange) >=1, na.rm = TRUE),
+    stringsAsFactors = FALSE
+  ))
+  
+  cat("Finished:", niche, "\n")
+}
+
+write.csv(deg_summary, file = "DE_results_5p/DEG_summary_counts.csv", row.names = FALSE)
