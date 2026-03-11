@@ -1,0 +1,129 @@
+---
+title: "Fig. 1d"
+output: html_document
+author: "Seung J. Kim (skim823@uwo.ca)"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+# Load libraries
+library(readxl)         # for reading Excel files
+library(gtsummary)
+library(gt)
+library(dplyr)          # for data manipulation
+library(tidyr)          # for handling missing data
+library(janitor)        # optional: for cleaning column names
+
+# Read data
+metadata <- read_excel("/Users/jk/Documents/Lab2/visium/python_analysis/lambda/metadata_batch_effect.xlsx") %>%
+  clean_names() %>%
+  filter(library_id != "20_17478_A1")# makes column names lowercase and underscores
+
+# Check data
+str(metadata)
+summary(metadata)
+
+# Factor everything
+metadata <- metadata %>%
+  mutate(
+    cond = factor(cond, levels = c("IPF","NSIP","CHP","UNC")),
+    #outcome_24m = factor(outcome_24m),
+    age = as.numeric(age),
+    sex = factor(sex),
+    bmi = as.numeric(bmi),
+    packyears = as.numeric(packyears),
+    fvc = as.numeric(fvc),
+    dlco = as.numeric(dlco),
+    x6mwd = as.numeric(x6mwd)
+  )
+
+# 
+# # Remove rows with any missing predictor
+# metadata_complete <- metadata %>%
+#   drop_na(age, sex, bmi, packyears, fvc, dlco)  
+
+
+
+TABLE1 <- metadata %>%
+  select(cond, age, sex, bmi, packyears, fvc, dlco, x6mwd) %>%
+  tbl_summary(
+    by = cond,
+    missing_text = "(Missing data)",
+    label = list(
+      age ~ "Age (years)",
+      sex ~ "Sex",
+      bmi ~ "BMI",
+      packyears ~ "Smoking (pack-years)",
+      fvc ~ "FVC (% pred.)",
+      dlco ~ "DLCO (% pred.)",
+      x6mwd ~ "6MWD (m)"
+    )
+  ) %>%
+  modify_header(
+    #label = "**Variable**",
+    all_stat_cols() ~ "**{level}**<br>N = {n} ({style_percent(p, digits=1)}%)"
+  ) %>%
+  modify_abbreviation("IPF, idiopathic pulmonary fibrosis; NSIP, non-specific interstitial pneumonia;
+                      CHP, chronic hypersensitivity pneumonitis; UNC, unclassified case; BMI, body mass index;
+                      FVC, forced vital capacity; DLCO, diffusing capacity for carbon monoxide; 6MWD, 6-minute walk distance") %>%
+  add_overall(last = F) %>%
+  add_p() %>% 
+  bold_labels() %>% 
+  as_gt()
+
+TABLE1
+  
+```
+
+```{r}
+TABLE1 %>%
+  cols_width(
+    # label ~ px(170),
+    # stat_0 ~ px(125),
+    # stat_1 ~ px(125),
+    # stat_2 ~ px(125),
+    # stat_3 ~ px(125),
+    # stat_4 ~ px(125),
+    # p.value ~ px(60)
+    label ~ pct(20),
+    stat_0 ~ pct(15),
+    stat_1 ~ pct(15),
+    stat_2 ~ pct(15),
+    stat_3 ~ pct(15),
+    stat_4 ~ pct(15),
+    p.value ~ pct(15)
+  ) %>%
+  tab_options(
+    table.width =pct(90),
+    data_row.padding = px(3),
+    data_row.padding.horizontal = px(1),
+    column_labels.padding = px(3),
+    heading.padding = px(1),
+    heading.padding.horizontal = px(1),
+    table.font.color = "black",
+    table.font.size = 7,
+    table.font.names = c("Arial"),
+    column_labels.border.top.color = "black",
+    column_labels.border.bottom.color = "black",
+    
+    
+    #table.border.top.color = "black"
+    table.border.bottom.color = "black",
+    
+    footnotes.padding.horizontal = px(1),
+    footnotes.padding = px(1),
+    
+    source_notes.padding = px(1),
+   
+
+    
+  ) %>%
+  gtsave(filename = "TABLE1.pdf")
+  
+
+```
+
