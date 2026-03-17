@@ -1,5 +1,5 @@
 ---
-title: "Fig 6g, h"
+title: "Fig 6g, h, Table 2"
 output: html_document
 ---
 
@@ -195,6 +195,7 @@ ggplot(plot_df, aes(x = comp1, y = comp2)) +
 library(survival)
 library(ggsurvfit)
 library(gtsummary)
+library(gt)
 
 
 df <- results_unc %>%
@@ -262,14 +263,69 @@ cox_res %>%
   tbl_regression(exp = T) %>%
   bold_labels() %>%
   bold_p(t = 0.05) %>% 
+  modify_caption("**Table 2. Cox regression output**") %>%
   as_gt() %>%
-  gt::gtsave("tbl_cox_output.png")
+  tab_options(
+    table.width =pct(30),
+    data_row.padding = px(3),
+    data_row.padding.horizontal = px(1),
+    column_labels.padding = px(3),
+    heading.padding = px(1),
+    heading.padding.horizontal = px(1),
+    table.font.color = "black",
+    table.font.size = 7,
+    table.font.names = c("Arial"),
+    column_labels.border.top.color = "black",
+    column_labels.border.bottom.color = "black",
+    
+    
+    #table.border.top.color = "black"
+    table.border.bottom.color = "black",
+    
+    footnotes.padding.horizontal = px(1),
+    footnotes.padding = px(1),
+    
+    source_notes.padding = px(1),
+   
 
+    
+  ) %>%
+  gt::gtsave("tbl_cox_output.pdf")
 
-# testing cox assumptions
-
-cox.zph(cox_res)
 ```
 ```{r, fig.height=4, fig.width=4}
 km_plot
+```
+```{r}
+cox_res %>%
+  tbl_regression(exp = T) %>%
+  bold_labels() %>%
+  bold_p(t = 0.05) %>% 
+  modify_caption("**Table 2. Cox regression output**") %>%
+  as_gt() %>%
+  tab_options(
+    table.width =pct(30),
+    data_row.padding = px(3),
+    data_row.padding.horizontal = px(1),
+    column_labels.padding = px(3),
+    heading.padding = px(1),
+    heading.padding.horizontal = px(1),
+    table.font.color = "black",
+    table.font.size = 7,
+    table.font.names = c("Arial"),
+    column_labels.border.top.color = "black",
+    column_labels.border.bottom.color = "black",
+    
+    
+    #table.border.top.color = "black"
+    table.border.bottom.color = "black",
+    
+    footnotes.padding.horizontal = px(1),
+    footnotes.padding = px(1),
+    
+    source_notes.padding = px(1),
+   
+
+    
+  )
 ```

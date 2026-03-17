@@ -1,5 +1,5 @@
 ---
-title: "Fig. 1d"
+title: "Table 1"
 output: html_document
 ---
 
@@ -66,6 +66,7 @@ TABLE1 <- metadata %>%
     #label = "**Variable**",
     all_stat_cols() ~ "**{level}**<br>N = {n} ({style_percent(p, digits=1)}%)"
   ) %>%
+  modify_caption("**Table 1. Patient Characteristics**") %>%
   modify_abbreviation("IPF, idiopathic pulmonary fibrosis; NSIP, non-specific interstitial pneumonia;
                       CHP, chronic hypersensitivity pneumonitis; UNC, unclassified case; BMI, body mass index;
                       FVC, forced vital capacity; DLCO, diffusing capacity for carbon monoxide; 6MWD, 6-minute walk distance") %>%
